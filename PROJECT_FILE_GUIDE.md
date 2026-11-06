@@ -1,8 +1,10 @@
 # Project File Guide — Team 9 Adaptive Traffic Signal Controller
 
-The single detailed reference for this project: what every file is, how the
-system runs, what data/artefacts exist, what was removed and why, and the current
-status. For the short version see [README.md](README.md).
+The detailed reference for the base application and its Docker experiment copy.
+Sections A–H record the base-project audit snapshot from 2026-10-15; section I
+documents the Docker deployment added afterward and is the current deployment
+reference. Counts and test results in A–H are historical snapshot values. For
+the short version see [README.md](README.md).
 
 Facts in this guide were verified on 2026-10-15 against the working tree and a
 green test run (`python -m unittest discover -s tests` → **179 tests OK**).
@@ -56,7 +58,7 @@ in the live database there are **0 clamp violations**.
 
 ---
 
-## B. Current file tree
+## B. Base-application file tree (2026-10-15 snapshot)
 
 79 files, 10,578,464 bytes (~10.09 MB), excluding `__pycache__` (regenerated on
 run).
@@ -479,7 +481,7 @@ All removals to date, with sizes. No protected file was ever touched.
 
 ---
 
-## H. Final status
+## H. Base-application status (2026-10-15 snapshot)
 
 - **Files:** 79 (excluding regenerated `__pycache__`), **10,578,464 B (~10.09 MB)**.
 - **Markdown:** `README.md`, `PROJECT_FILE_GUIDE.md`, `dataset/data_dictionary.md`.
@@ -515,3 +517,72 @@ $env:PYTHONPATH="."; python -m unittest discover -s tests      # 179 OK
 python -c "import json; json.load(open('node_red/flows.json', encoding='utf-8')); print('flows ok')"
 python -m py_compile src/simulator/scenario_manager.py src/analytics/predict.py src/simulator/traffic_replay.py src/database/repository.py
 ```
+
+---
+
+## I. Docker experiment deployment (2026-11-06)
+
+This folder is the separate Docker experiment copy. Its Docker deployment files
+were added here; the completed original project folder was not modified. For
+the complete Docker setup and troubleshooting guide, see
+[README-Docker.md](README-Docker.md).
+
+### Docker files and roles
+
+- `Dockerfile` builds the shared Python runtime image for the database
+  initializer, controller, publisher, and actuator.
+- `docker-compose.yml` runs the traffic stack using published image tags under
+  `eswarsamanthula`: `traffic-controller-app:1.1.0`,
+  `traffic-controller-nodered:1.0.0`, and `traffic-controller-mqtt:1.0.0`.
+- `docker-compose.tunnel.yml` is a local-only overlay for Nginx and
+  `cloudflared`; it is not required by the portable Compose file.
+- `tunnel/nginx.conf` protects only `/dashboard` and `/ws/traffic` with HTTP
+  Basic Authentication, returns 404 for other paths, and resolves Node-RED
+  through Docker DNS so a changed container IP does not leave a stale upstream.
+- `mqtt/Dockerfile`, `mqtt/mosquitto.conf`, and `node_red/Dockerfile` define the
+  independent broker and Node-RED images.
+- `config/docker-settings.yaml` points service clients to the Compose MQTT
+  hostname and enables a continuous simulation loop. The publisher refreshes
+  replayed timestamps while preserving the source dataset.
+- `.dockerignore` excludes local tunnel credentials and unrelated files from
+  the app build context. `.gitignore` excludes `tunnel/auth/htpasswd`,
+  `tunnel/auth/dashboard-password.txt`, and the local `data/` database.
+- `README-Docker.md` documents setup, volumes, ports, Quick Tunnel operation,
+  portable use, and stop commands.
+
+### Run and persistence
+
+The portable stack runs without the source development environment; its
+services use the published images. From a folder containing
+`docker-compose.yml`, another laptop can run:
+
+```powershell
+docker compose pull
+docker compose up -d
+```
+
+From this experiment folder, start the optional authenticated Quick Tunnel
+with:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared
+```
+
+Use the newly printed `trycloudflare.com` URL plus `/dashboard`; Quick Tunnel
+URLs expire when `cloudflared` stops. The dashboard password is kept locally
+in the ignored `tunnel/auth/dashboard-password.txt` file and is not included in
+the images or Git repository. The editor remains bound to host loopback; MQTT
+and SQLite are not published to the host or tunnel.
+
+The named volumes `mosquitto-data`, `node-red-data`, and `traffic-data` persist
+broker state, Node-RED state, and SQLite history. Stop all services while
+keeping containers and volumes with:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml stop
+```
+
+The tunnel was verified to return the authenticated live dashboard and a
+WebSocket actuator-health event after correcting Nginx to use Docker DNS. A
+separate clean-laptop deployment has not been independently tested.
