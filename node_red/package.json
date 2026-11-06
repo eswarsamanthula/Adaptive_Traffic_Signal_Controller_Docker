@@ -1,0 +1,14 @@
+{
+  "name": "team9-traffic-node-red",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node-RED dashboard and SQLite nodes for the Team 9 traffic simulation",
+  "allowScripts": {
+    "node-red-dashboard": true,
+    "sqlite3": true
+  },
+  "dependencies": {
+    "node-red-dashboard": "3.6.6",
+    "node-red-node-sqlite": "1.1.1"
+  }
+}

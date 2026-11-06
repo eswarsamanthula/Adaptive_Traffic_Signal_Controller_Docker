@@ -1,0 +1,67 @@
+services:
+  mqtt:
+    image: eswarsamanthula/traffic-controller-mqtt:1.0.0
+    restart: unless-stopped
+    volumes:
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -t docker/health -m ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  database-init:
+    image: eswarsamanthula/traffic-controller-app:1.1.0
+    command: ["sh", "-c", "python -m src.database.db --settings config/docker-settings.yaml && chown -R 1000:1000 /app/data"]
+    volumes:
+      - traffic-data:/app/data
+    restart: "no"
+
+  actuator:
+    image: eswarsamanthula/traffic-controller-app:1.1.0
+    command: ["python", "-m", "src.actuator.actuator_node", "--settings", "config/docker-settings.yaml"]
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    restart: unless-stopped
+
+  controller:
+    image: eswarsamanthula/traffic-controller-app:1.1.0
+    command: ["python", "-m", "src.service.controller_service", "--settings", "config/docker-settings.yaml"]
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
+      actuator:
+        condition: service_started
+    volumes:
+      - traffic-data:/app/data
+    restart: unless-stopped
+
+  publisher:
+    image: eswarsamanthula/traffic-controller-app:1.1.0
+    command: ["python", "-m", "src.mqtt.publisher", "--settings", "config/docker-settings.yaml", "--speed", "60", "--limit", "0", "--live-timestamps"]
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    restart: unless-stopped
+
+  node-red:
+    image: eswarsamanthula/traffic-controller-nodered:1.0.0
+    ports:
+      - "127.0.0.1:1880:1880"
+    volumes:
+      - node-red-data:/data
+      - traffic-data:/traffic-data
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  mosquitto-data:
+  node-red-data:
+  traffic-data:

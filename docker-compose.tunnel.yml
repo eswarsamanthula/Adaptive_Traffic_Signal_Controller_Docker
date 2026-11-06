@@ -1,0 +1,22 @@
+# Local-only overlay for Cloudflare Quick Tunnel. Do not send this file or the
+# tunnel/auth/htpasswd secret file with the portable project Compose file.
+services:
+  dashboard-gateway:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ./tunnel/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tunnel/auth/htpasswd:/etc/nginx/auth/htpasswd:ro
+    depends_on:
+      node-red:
+        condition: service_started
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "--url", "http://dashboard-gateway:8080"]
+    restart: unless-stopped
+    depends_on:
+      dashboard-gateway:
+        condition: service_started

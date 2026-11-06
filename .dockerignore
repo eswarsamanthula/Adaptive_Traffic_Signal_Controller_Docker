@@ -1,0 +1,16 @@
+.git
+.venv
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+report_assets/
+tests/
+results/
+tunnel/
+docker-compose.tunnel.yml
+work/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.bak
+*.zip
