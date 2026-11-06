@@ -77,11 +77,11 @@
 {\centering \Large\bfseries ABSTRACT\par}
 Fixed-time traffic signals allocate a preset green duration to each approach, regardless of the traffic waiting at that approach. This can waste green time when demand is low on one approach while queues continue to grow on another. This project, ``\ProjectTitle{}'', develops and evaluates a simulated Internet-of-Things (IoT) adaptive traffic signal controller for a four-approach intersection and compares its behaviour with a fixed-time baseline.
 
-The system connects a Python traffic simulator, an MQTT messaging layer using the Mosquitto broker, Node-RED flows, a SQLite database, a deterministic adaptive controller and a simulated actuator. The simulator publishes traffic readings; Node-RED validates and stores the readings; the controller calculates bounded green durations; and the actuator applies signal commands and returns acknowledgements. A dashboard displays traffic, signal and system information. Four machine-learning classifiers are also trained and evaluated for congestion classification. These models are used for offline analytics and evaluation; the live signal controller uses deterministic rules rather than an ML prediction.
+The system connects a Python traffic simulator, an MQTT messaging layer using the Mosquitto broker, Node-RED flows, a SQLite database, a deterministic adaptive controller and a simulated actuator. The simulator publishes traffic readings; Node-RED validates and stores the readings; the controller calculates bounded green durations; and the actuator applies signal commands and returns acknowledgements. A dashboard displays traffic, signal and system information. For portable deployment, the same software is also packaged with Docker and Docker Compose: published container images, a shared Compose configuration, persistent volumes and an optional authenticated Cloudflare Tunnel gateway that exposes only the dashboard. Four machine-learning classifiers are also trained and evaluated for congestion classification. These models are used for offline analytics and evaluation; the live signal controller uses deterministic rules rather than an ML prediction.
 
-The dataset was prepared by Team 9 using real-world traffic data as a reference. It contains 1,250 one-minute timestamps for four approaches, giving 5,000 traffic readings. The team organised the readings, signal-cycle information and adaptive-decision records into a workbook and corresponding CSV files. The original external dataset source details were not available in the project records. Therefore, the dataset is described as team-prepared and derived, not as raw measurements collected by physical roadside sensors. The project also includes a testing environment for actuator validation, fault handling and Stop/Reset behaviour. All reported control results are from simulation and do not demonstrate deployment on a public road.
+The dataset was prepared by Team 9 using real-world traffic data as a reference. It contains 1,250 one-minute timestamps for four approaches, giving 5,000 traffic readings. The team organised the readings, signal-cycle information and adaptive-decision records into a workbook and corresponding CSV files. The original external dataset source details were not available in the project records. Therefore, the dataset is described as team-prepared and derived, not as raw measurements collected by physical roadside sensors. The project also includes a testing environment for actuator validation, fault handling and Stop/Reset behaviour. All reported control results are from simulation and do not demonstrate deployment on a public road. The Docker deployment has been checked for local and tunnelled dashboard access, but a separate clean-laptop run has not yet been independently verified.
 
-\textbf{Keywords:} adaptive traffic signal; Internet of Things; MQTT; Node-RED; SQLite; machine learning; closed-loop control
+\textbf{Keywords:} adaptive traffic signal; Internet of Things; MQTT; Node-RED; SQLite; machine learning; closed-loop control; Docker; containerisation
 
 \clearpage
 \tableofcontents
@@ -102,7 +102,9 @@ ACK & Acknowledgement \\\hline
 API & Application Programming Interface \\\hline
 CPU & Central Processing Unit \\\hline
 CSV & Comma-Separated Values \\\hline
+DNS & Domain Name System \\\hline
 F1 & F1-score \\\hline
+HTTP & Hypertext Transfer Protocol \\\hline
 IoT & Internet of Things \\\hline
 JSON & JavaScript Object Notation \\\hline
 ML & Machine Learning \\\hline
@@ -142,6 +144,7 @@ The objectives of the project are:
   \item Measure model training time, inference latency, memory use and saved model size.
   \item Evaluate closed-loop queue behaviour, command acknowledgements and signal safety.
   \item Provide a dashboard and testing tools for observing traffic, decisions, actuator state and fault-handling behaviour.
+  \item Package the complete system with Docker and Docker Compose so that it can be started consistently from published container images, with persistent storage and a restricted, authenticated option for remote dashboard access.
 \end{enumerate}
 
 \begin{table}[htbp]\centering\small
@@ -154,6 +157,7 @@ Adaptive controller & Fixed-time versus adaptive simulation & Queue, delay and f
 ML classification & Temporal test-set metrics & Four trained classifiers and result tables \\\hline
 Computational cost & Fit time, latency and memory & Benchmark results \\\hline
 Safety and feedback & Actuator validation and acknowledgement tests & Stop/Reset and fault-handling results \\\hline
+Container deployment & Image publication, Compose startup, and local and tunnelled dashboard checks & Docker files, published images and dashboard/WebSocket check results \\\hline
 \end{tabular}\end{table}
 
 \section{Existing and proposed systems}
@@ -172,12 +176,12 @@ Testing & Schedule execution & Testing lab, fault checks and Stop/Reset validati
 \end{tabular}\end{table}
 
 \section{Scope and assumptions}
-The implementation covers one simulated intersection with four approaches: North, South, East and West. It includes a traffic simulator, MQTT communication, Node-RED integration, SQLite storage, a deterministic controller, a simulated actuator, an analytics pipeline and a dashboard. It does not include physical roadside sensors or signal heads. Pedestrian phases, emergency-vehicle pre-emption, public-transport priority and coordination between multiple intersections are outside the current scope.
+The implementation covers one simulated intersection with four approaches: North, South, East and West. It includes a traffic simulator, MQTT communication, Node-RED integration, SQLite storage, a deterministic controller, a simulated actuator, an analytics pipeline and a dashboard. It does not include physical roadside sensors or signal heads. Pedestrian phases, emergency-vehicle pre-emption, public-transport priority and coordination between multiple intersections are outside the current scope. The Docker packaging is a deployment layer around the same software simulation; it does not add physical hardware or change the control logic.
 
 The dataset is team-prepared using real-world traffic data as a reference. Since the original external source details were not recorded, it is not treated as a verified raw field dataset. All queue and delay comparisons in this report are simulation results.
 
 \section{Report organisation}
-Chapter~2 presents the requirements and technologies. Chapter~3 documents the dataset and experimental methodology. Chapter~4 explains the system architecture and implementation. Chapter~5 presents the machine-learning and computational evaluation. Chapter~6 describes closed-loop testing and safety verification. Chapter~7 discusses the results and their validity. Chapter~8 presents the conclusion, limitations and future work.
+Chapter~2 presents the requirements and technologies. Chapter~3 documents the dataset and experimental methodology. Chapter~4 explains the system architecture and implementation, including the Docker-based deployment. Chapter~5 presents the machine-learning and computational evaluation. Chapter~6 describes closed-loop testing, safety verification and Docker deployment checks. Chapter~7 discusses the results and their validity. Chapter~8 presents the conclusion, limitations and future work.
 
 \clearpage
 % CHAPTER 2
@@ -196,10 +200,17 @@ Node-RED & Flow-based message ingestion, validation, database integration and da
 SQLite & Local storage for readings, decisions, signal events and acknowledgements~\cite{ref4} \\\hline
 Scikit-learn & Training and evaluation of the four classification models~\cite{ref5} \\\hline
 Excel and CSV & Dataset workbook and files used by scripts \\\hline
+Docker & Packages the application, Node-RED and Mosquitto as container images~\cite{ref7} \\\hline
+Docker Compose & Defines and starts the multi-container system, its network, restart policies and volumes~\cite{ref8} \\\hline
+Nginx & Gateway that allows only the authenticated dashboard and WebSocket routes in the optional tunnel setup~\cite{ref9} \\\hline
+Cloudflare Tunnel & Optional temporary (Quick Tunnel) public route to the dashboard gateway~\cite{ref10} \\\hline
 \end{tabular}\end{table}
 
 \subsection{MQTT communication}
 MQTT is a publish--subscribe messaging protocol. A publisher sends a message to a topic, and the broker forwards it to clients that subscribe to that topic. This separates message producers from consumers. MQTT defines Quality of Service levels that provide different delivery guarantees and overheads~\cite{ref1}. In this project, the broker connects the simulator, Node-RED, controller and actuator.
+
+\subsection{Containerisation with Docker}
+Docker packages an application together with its runtime dependencies into an image that can be run as a container, which reduces differences between development and deployment machines~\cite{ref7}. Docker Compose describes several such containers, their start-up dependencies, networks and storage volumes in one configuration file~\cite{ref8}. In this project, containerisation is used to start the existing simulation consistently; it does not change the controller logic or the system architecture.
 
 \section{Functional requirements}
 \begin{enumerate}
@@ -212,6 +223,9 @@ MQTT is a publish--subscribe messaging protocol. A publisher sends a message to 
   \item The dashboard displays traffic and signal information and provides access to testing controls.
   \item The analytics pipeline trains and evaluates four congestion classifiers using a temporal split.
   \item The system supports a fixed-time baseline for comparison.
+  \item The Docker deployment starts the controller, publisher, actuator, database initialiser, Node-RED and Mosquitto from container images using Docker Compose.
+  \item Database history, Node-RED state and broker state persist in named Docker volumes across stop and start.
+  \item The optional remote-access setup exposes only the authenticated dashboard page and its WebSocket route.
 \end{enumerate}
 
 \section{Non-functional requirements}
@@ -222,10 +236,12 @@ MQTT is a publish--subscribe messaging protocol. A publisher sends a message to 
   \item \textbf{Modularity:} components should have clearly defined responsibilities and exchange data through configured interfaces.
   \item \textbf{Efficiency:} the system and benchmarked models should run on a CPU-only development machine.
   \item \textbf{Validity:} simulation findings and the team-prepared dataset must not be represented as physical field measurements.
+  \item \textbf{Portability:} the system should be startable from published images and a Compose file, with container-specific settings kept separate from the Windows settings.
+  \item \textbf{Security:} public access must be authenticated and limited to the dashboard; the MQTT port, the SQLite database and the Node-RED editor must not be exposed publicly, and credentials must be kept out of Git, images and shared reports.
 \end{itemize}
 
 \section{Development and evaluation environment}
-The recorded benchmark environment was Windows 11 with Python 3.13.7, 12 logical CPU cores, scikit-learn 1.7.2 and NumPy 2.2.6. The ML experiments were run on CPU without a GPU. The IoT pipeline uses Eclipse Mosquitto, Node-RED and SQLite. The project is a software simulation; no physical traffic-signal hardware is claimed.
+The recorded benchmark environment was Windows 11 with Python 3.13.7, 12 logical CPU cores, scikit-learn 1.7.2 and NumPy 2.2.6. The ML experiments were run on CPU without a GPU. The IoT pipeline uses Eclipse Mosquitto, Node-RED and SQLite. The project is a software simulation; no physical traffic-signal hardware is claimed. The Docker deployment uses Docker Compose with three published images (Section~\ref{sec:docker}); the machine-learning benchmark results in Chapter~5 were recorded in the environment above and were not repeated inside containers.
 
 \begin{table}[htbp]\centering\small
 \caption{Development and evaluation environment}\label{tab:environment}
@@ -239,6 +255,8 @@ Scikit-learn & 1.7.2 \\\hline
 Messaging & Eclipse Mosquitto with MQTT \\\hline
 Flow integration & Node-RED \\\hline
 Database & SQLite \\\hline
+Container deployment & Docker Compose with three published images \\\hline
+Optional public access & Nginx gateway with Cloudflare Quick Tunnel \\\hline
 \end{tabular}\end{table}
 
 \clearpage
@@ -370,12 +388,86 @@ All-red duration & 2 seconds \\\hline
 The actuator receives a command identifying the phase and requested green duration. It applies signal changes through the required GREEN, YELLOW and ALL\_RED sequence. It rejects unsafe commands, including commands that would result in conflicting greens or skip a required clearance interval. The actuator returns an acknowledgement describing the command outcome. The acknowledgement is used to verify that the command was processed rather than assuming that publication alone proves successful actuation.
 
 \section{Dashboard}
-The Node-RED dashboard provides a visual view of the simulated intersection. It presents traffic readings, queues, signal states, controller decisions, acknowledgements and system status. The primary dashboard route in the project is \texttt{/dashboard}; the additional \texttt{/ui/} route is secondary.
+The Node-RED dashboard provides a visual view of the simulated intersection. It presents traffic readings, queues, signal states, controller decisions, acknowledgements and system status. The primary dashboard route in the project is \texttt{/dashboard}; the additional \texttt{/ui/} route is secondary. The Docker deployment serves the same Node-RED dashboard, and its appearance is the same as in the original setup. Figure~\ref{fig:dashboard-overview} and the screenshots in Appendix~A therefore represent both the original and the Docker deployments.
 
 \begin{figure}[htbp]\centering
 \figimg{dashboard_overview.png}{width=0.95\textwidth,height=0.48\textheight,keepaspectratio}
 \caption{Overview of the running traffic dashboard.}\label{fig:dashboard-overview}
 \end{figure}
+
+\section{Docker-based deployment}\label{sec:docker}
+\subsection{Baseline project and what Docker added}
+Before the Docker work, the project was already a complete software simulation of a four-approach intersection. It contained the Python traffic-replay and simulation code, the deterministic adaptive controller with configured safe timings, the simulated actuator with command validation and acknowledgements, MQTT messaging through Mosquitto, Node-RED flows for validation, dashboard updates, Testing Lab controls and SQLite persistence, the dataset and ML artifacts, analytics and evaluation results, automated tests, Windows startup scripts and a development \texttt{requirements.txt}. The historical file guide recorded this base project as 79 files at the time of its inventory on 15 October 2026. Docker was added as a packaging and launch layer so that the same workflow can be started consistently; the traffic-control behaviour itself was not redesigned. Docker packages the components shown in Figure~\ref{fig:architecture} without changing that architecture.
+
+\begin{table}[htbp]\centering\small
+\caption{New deployment files added for Docker}\label{tab:docker-files}
+\begin{tabular}{|p{0.38\textwidth}|p{0.50\textwidth}|}\hline
+\textbf{File} & \textbf{Purpose} \\\hline
+\texttt{Dockerfile} & Builds one Python application image shared by the controller, publisher, actuator and database initialiser \\\hline
+\texttt{docker-compose.yml} & Defines the services, dependencies, restart policies, internal network and persistent named volumes \\\hline
+\texttt{docker-compose.tunnel.yml} & Optional local overlay adding the Cloudflare Tunnel and dashboard gateway \\\hline
+\texttt{tunnel/nginx.conf} & Nginx gateway that allows only the authenticated dashboard and WebSocket routes; Docker DNS resolution follows Node-RED if its container IP changes \\\hline
+\texttt{mqtt/Dockerfile}, \texttt{mqtt/mosquitto.conf} & Mosquitto image setup and broker configuration \\\hline
+\texttt{node\_red/Dockerfile} & Node-RED image with the dashboard, project flow and SQLite support \\\hline
+\texttt{requirements-docker.txt} & Minimal Python runtime dependencies for the application image \\\hline
+\texttt{.dockerignore} & Keeps local tunnel credentials and unrelated files out of the application image build context \\\hline
+\texttt{README-Docker.md} & Docker setup, security, persistence, Quick Tunnel and another-laptop instructions \\\hline
+\end{tabular}\end{table}
+
+\begin{table}[htbp]\centering\small
+\caption{Existing project files added or updated for container operation}\label{tab:docker-updated}
+\begin{tabular}{|p{0.38\textwidth}|p{0.50\textwidth}|}\hline
+\textbf{File} & \textbf{Change} \\\hline
+\texttt{config/docker-settings.yaml} & Container-specific settings, including the Compose MQTT hostname and continuous replay behaviour; the Windows settings remain separate \\\hline
+\texttt{src/mqtt/publisher.py} & Supports live timestamps during replay so that historical dataset timestamps do not make incoming readings appear stale \\\hline
+\texttt{.gitignore} & Excludes the local dashboard password, its authentication hash and local database data \\\hline
+\texttt{README.md}, \texttt{PROJECT\_FILE\_GUIDE.md} & Updated to describe the Docker deployment and image names \\\hline
+\end{tabular}\end{table}
+
+\subsection{Container images and services}
+Three images are published on Docker Hub (Table~\ref{tab:docker-images}). The Python services share the application image, while Node-RED and Mosquitto use their own images.
+
+\begin{table}[htbp]\centering\small
+\caption{Published Docker Hub images}\label{tab:docker-images}
+\begin{tabular}{|p{0.63\textwidth}|p{0.25\textwidth}|}\hline
+\textbf{Image} & \textbf{Used for} \\\hline
+{\footnotesize\texttt{eswarsamanthula/\allowbreak traffic-controller-app:1.1.0}} & Controller, publisher, actuator and database initialiser \\\hline
+{\footnotesize\texttt{eswarsamanthula/\allowbreak traffic-controller-nodered:1.0.0}} & Node-RED flows and dashboard \\\hline
+{\footnotesize\texttt{eswarsamanthula/\allowbreak traffic-controller-mqtt:1.0.0}} & Mosquitto MQTT broker \\\hline
+\end{tabular}\end{table}
+
+The Compose file starts these services on an internal Docker network, with start-up dependencies and restart policies. Three named volumes keep state outside the containers (Table~\ref{tab:docker-volumes}). A new laptop starts with fresh volumes and therefore with empty database history.
+
+\begin{table}[htbp]\centering\small
+\caption{Persistent Docker volumes}\label{tab:docker-volumes}
+\begin{tabular}{|p{0.30\textwidth}|p{0.58\textwidth}|}\hline
+\textbf{Volume} & \textbf{Contents} \\\hline
+\texttt{traffic-data} & SQLite history \\\hline
+\texttt{node-red-data} & Node-RED state \\\hline
+\texttt{mosquitto-data} & Mosquitto broker state \\\hline
+\end{tabular}\end{table}
+
+\subsection{Starting and stopping the system}
+From a folder containing \texttt{docker-compose.yml}, the portable stack is started with:
+{\small
+\begin{verbatim}
+docker compose pull
+docker compose up -d
+\end{verbatim}}
+The optional local Cloudflare Quick Tunnel is started with the tunnel overlay:
+{\scriptsize
+\begin{verbatim}
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f cloudflared
+\end{verbatim}}
+The \texttt{cloudflared} log prints a temporary \texttt{trycloudflare.com} address; the dashboard is reached by appending \texttt{/dashboard}. This address changes after \texttt{cloudflared} stops. All services are stopped, with volumes and database history preserved, using:
+{\scriptsize
+\begin{verbatim}
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml stop
+\end{verbatim}}
+
+\subsection{Security of the Docker deployment}
+The public tunnel is authenticated and, through the Nginx gateway, allows only the dashboard page and its WebSocket route. The Node-RED editor is not passed through the gateway. MQTT port 1883 and the SQLite database are not exposed publicly. The dashboard password is kept in a local file that is excluded from Git, from the application image build context and from this report; the password and its authentication hash must not be committed, baked into an image or shared. The deployment remains a software simulation.
 
 \clearpage
 % CHAPTER 5
@@ -520,6 +612,23 @@ One acknowledgement withheld & Operation remains unconfirmed; restart inhibited 
 \section{Automated verification}
 The final reported automated test run contained 200 passing tests and zero failures. The successful safety paths reported no conflicting-green or skipped-clearance violations. The acknowledgement-withheld test remains a negative test: it is expected to prevent confirmation and restart rather than be reported as a successful Stop/Reset operation.
 
+\section{Docker deployment checks}
+The Docker deployment was checked at the dashboard and gateway level. With authentication, local and public dashboard requests returned HTTP 200, and the authenticated WebSocket returned the current healthy actuator status. These checks show that the containerised dashboard path and the authenticated tunnel route were working in the tested run.
+
+\begin{table}[htbp]\centering\small
+\caption{Docker deployment checks and security configuration}\label{tab:docker-checks}
+\begin{tabular}{|p{0.38\textwidth}|p{0.50\textwidth}|}\hline
+\textbf{Item} & \textbf{Result or configuration} \\\hline
+Local dashboard request (authenticated) & HTTP 200 \\\hline
+Public tunnel dashboard request (authenticated) & HTTP 200 \\\hline
+Authenticated WebSocket & Returned current healthy actuator status \\\hline
+Node-RED editor & Not passed through the gateway \\\hline
+MQTT port 1883 and SQLite database & Not exposed publicly \\\hline
+Run on a separate clean laptop & Not yet independently verified \\\hline
+\end{tabular}\end{table}
+
+These checks do not replace the closed-loop and safety tests above, and they do not show that the stack has been run on a different machine.
+
 \clearpage
 % CHAPTER 7
 \chapter{Results and Discussion}
@@ -536,10 +645,13 @@ The congestion test set is imbalanced, with 67.80\% of its rows labelled Low. Th
 
 The live controller does not currently use these ML predictions. It uses deterministic rules, which keeps the current signal-timing behaviour separate from the offline ML experiment and avoids overstating the role of machine learning in the implemented system.
 
+\section{Interpretation of the Docker deployment}
+Docker addresses a practical problem of the original project: the system depends on Python, Mosquitto, Node-RED and SQLite, which previously had to be prepared and started separately. Packaging them as published images with a Compose file allows the stack to be started with \texttt{docker compose pull} and \texttt{docker compose up -d}, and named volumes keep database, Node-RED and broker state across stop and start. Because the dashboard served from the containers looks the same as before, the existing dashboard figures apply to both deployments. The optional tunnel adds remote viewing, but only for the authenticated dashboard and WebSocket routes, so the editor, MQTT port and database stay private. Docker changes how the simulation is deployed and accessed; it does not change the controller, the simulated results or the ML findings.
+
 \section{Validity of the evaluation}
 The traffic dataset was prepared by the team using real-world traffic data as a reference; the original external source details are not available in the project records. The traffic-control comparison is a simplified simulation on this prepared demand, and the actuator is simulated. The in-process closed-loop test measures application-level processing and does not include physical network or field-device latency. Consequently, the results are useful for comparing the implemented software paths under the defined test conditions, but they are not evidence of measured improvement on a public road.
 
-The ML test set comes from a temporal split of a single prepared day. Performance may differ on other days, intersections, traffic distributions or sensor types. Computational results also depend on the development machine and measurement method.
+The ML test set comes from a temporal split of a single prepared day. Performance may differ on other days, intersections, traffic distributions or sensor types. Computational results also depend on the development machine and measurement method. For the Docker deployment, local and tunnelled dashboard checks were successful, but a separate clean-laptop run has not been independently verified. Portability is therefore prepared through published images and Compose, and cross-laptop execution should not be described as tested.
 
 \clearpage
 % CHAPTER 8
@@ -548,6 +660,8 @@ The ML test set comes from a temporal split of a single prepared day. Performanc
 This project implemented a simulated IoT-based adaptive traffic signal controller for a four-approach intersection. The software pipeline connects a Python traffic simulator, MQTT communication through Mosquitto, Node-RED integration, SQLite storage, a deterministic controller, a simulated actuator and a dashboard. The actuator returns acknowledgements, allowing the system to verify command outcomes rather than assuming that a published command has been applied.
 
 The team prepared a structured dataset with 5,000 traffic readings across 1,250 one-minute timestamps and four approaches. Four ML classifiers were evaluated using a chronological split. The ML results show that the best model depends on the metric, and the current classifiers have limited High-class recall. The live controller remains rule-based. In the recorded traffic simulation, the adaptive controller reduced average delay and queue and improved the fairness index, but it also increased the maximum red waiting time. Stop/Reset validation confirmed successful operation only after all four RED acknowledgements were received and prevented restart when an acknowledgement was withheld.
+
+The system was also packaged with Docker and Docker Compose. Three images are published on Docker Hub, named volumes preserve database, Node-RED and broker state, and an optional authenticated Cloudflare Tunnel with an Nginx gateway exposes only the dashboard and its WebSocket route. Local and public dashboard checks returned HTTP 200 and the authenticated WebSocket returned healthy actuator status. The deployment remains a software simulation, and its execution on a separate clean laptop has not yet been independently verified.
 
 \section{Limitations}
 \begin{itemize}
@@ -558,6 +672,8 @@ The team prepared a structured dataset with 5,000 traffic readings across 1,250 
   \item The ML experiment uses one temporal test period from a single prepared day, and the High class is under-represented.
   \item The in-process closed-loop latency test excludes physical MQTT network, broker and field-device delays.
   \item Pedestrian phases, emergency-vehicle pre-emption, public-transport priority and multi-intersection coordination are not implemented.
+  \item The Docker deployment has not been independently run on a separate clean laptop, so cross-laptop portability is prepared but not verified.
+  \item The Cloudflare Quick Tunnel address is temporary and changes after \texttt{cloudflared} stops, and a new Docker deployment starts with empty database history.
 \end{itemize}
 
 \section{Future work}
@@ -570,6 +686,7 @@ The team prepared a structured dataset with 5,000 traffic readings across 1,250 
   \item Investigate whether ML congestion forecasts can safely support the deterministic controller, with a separate evaluation before enabling any live influence.
   \item Add MQTT authentication and encryption and test the system on embedded hardware before any real deployment.
   \item Include physical network and actuator timing in a future end-to-end performance evaluation.
+  \item Run and document the Docker deployment on a clean laptop to verify portability, and consider a stable authenticated address in place of the temporary Quick Tunnel URL if long-term remote access is needed.
 \end{itemize}
 
 % REFERENCES
@@ -585,6 +702,10 @@ The team prepared a structured dataset with 5,000 traffic readings across 1,250 
 \bibitem{ref4} SQLite Consortium, ``SQLite documentation,'' \url{https://www.sqlite.org/docs.html}.
 \bibitem{ref5} F. Pedregosa \textit{et al.}, ``Scikit-learn: Machine learning in Python,'' \textit{Journal of Machine Learning Research}, vol. 12, pp. 2825--2830, 2011.
 \bibitem{ref6} F. V. Webster, ``Traffic signal settings,'' Road Research Technical Paper No. 39, Her Majesty's Stationery Office, London, 1958.
+\bibitem{ref7} D. Merkel, ``Docker: Lightweight Linux containers for consistent development and deployment,'' \textit{Linux Journal}, vol. 2014, no. 239, 2014.
+\bibitem{ref8} Docker Inc., ``Docker Compose documentation,'' \url{https://docs.docker.com/compose/}.
+\bibitem{ref9} Nginx, ``nginx documentation,'' \url{https://nginx.org/en/docs/}.
+\bibitem{ref10} Cloudflare, ``Cloudflare Tunnel,'' Cloudflare documentation, \url{https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/}.
 \end{thebibliography}
 
 % APPENDIX: supplementary project screenshots only. Generic example commands,
@@ -592,7 +713,7 @@ The team prepared a structured dataset with 5,000 traffic readings across 1,250 
 % were removed instead of being presented as implemented evidence.
 \clearpage\appendix
 \chapter{Dashboard and Testing Evidence}
-This appendix contains genuine screenshots captured from the running project dashboard. All image files are uploaded to the same root folder as this \texttt{IOT\_Report.tex} file in Overleaf; therefore, figure commands use filenames without a \texttt{report\_assets/dashboard/} directory prefix.
+This appendix contains genuine screenshots captured from the running project dashboard. All image files are uploaded to the same root folder as this \texttt{IOT\_Report.tex} file in Overleaf; therefore, figure commands use filenames without a \texttt{report\_assets/dashboard/} directory prefix. The Docker deployment serves the same dashboard, so these screenshots are used for both the original and the Docker deployments.
 
 \begin{figure}[htbp]\centering
 \figimg{dashboard_signal_timing.png}{width=0.92\textwidth,height=0.48\textheight,keepaspectratio}
