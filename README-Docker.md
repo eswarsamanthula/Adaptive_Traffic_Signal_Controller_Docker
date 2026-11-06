@@ -40,6 +40,8 @@ Start again with `docker compose up -d`. Do not use `docker compose down --volum
 
 The tunnel overlay is intentionally not part of the portable Compose file. It exposes only the dashboard paths through an Nginx gateway protected by HTTP Basic Authentication. It returns 404 for the Node-RED editor and all other paths. The editor remains local-only. The username is `dashboard`; the generated plaintext password is in the ignored local file `tunnel/auth/dashboard-password.txt`, and its bcrypt hash is in `tunnel/auth/htpasswd`. Both files are excluded from the Docker build context by `.dockerignore` and from Git by `.gitignore`. Do not send either file to anyone or include them in an image.
 
+The gateway uses Docker's embedded DNS resolver for the Node-RED upstream, so it follows Node-RED if its container gets a new IP after restart. If a stopped Quick Tunnel returns Error 1033, start the stack again and use the newly generated URL; Quick Tunnel URLs expire when `cloudflared` stops.
+
 Start the base system and the local tunnel overlay:
 
 ```powershell
@@ -64,17 +66,23 @@ Stop the whole deployment (volumes remain) with:
 docker compose -f docker-compose.yml -f docker-compose.tunnel.yml down
 ```
 
+To stop every service while keeping the containers and volumes for a later restart:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml stop
+```
+
 ## Another laptop without the source project
 
-The portable `docker-compose.yml` references these image names:
+The portable `docker-compose.yml` references these public Docker Hub images:
 
-- `eswarsamanthula/traffic-controller-app:1.1.0` (local candidate; not published)
-- `eswarsamanthula/traffic-controller-nodered:1.0.0` (not published under this namespace)
-- `eswarsamanthula/traffic-controller-mqtt:1.0.0` (not published under this namespace)
+- [`eswarsamanthula/traffic-controller-app:1.1.0`](https://hub.docker.com/r/eswarsamanthula/traffic-controller-app/tags)
+- [`eswarsamanthula/traffic-controller-nodered:1.0.0`](https://hub.docker.com/r/eswarsamanthula/traffic-controller-nodered/tags)
+- [`eswarsamanthula/traffic-controller-mqtt:1.0.0`](https://hub.docker.com/r/eswarsamanthula/traffic-controller-mqtt/tags)
 
-The 1.1.0 application image contains the live-timestamp replay change and continuous loop settings. All three image tags are available locally under `eswarsamanthula`; none of these repositories/tags currently exists publicly under that namespace. No image has been pushed. The repositories must be created under the `eswarsamanthula` Docker Hub account, and the image contents/names approved before publishing. Until all three pushes complete, another laptop cannot pull the Compose stack as written.
+All three listed image tags have been published. The 1.1.0 application image contains the live-timestamp replay change and continuous loop settings. They are public, so a Docker Hub login is not needed to pull them.
 
-After all three images are approved and published, send your friend only this `docker-compose.yml` (not the source tree, tunnel overlay, or authentication file). They need Docker Desktop with internet access. In PowerShell, from the folder containing the Compose file, run:
+To run on another laptop without the source project, send your friend only this `docker-compose.yml` (not the source tree, tunnel overlay, or authentication files). They need Docker Desktop with internet access. In PowerShell, from the folder containing the Compose file, run:
 
 ```powershell
 docker compose pull
@@ -92,19 +100,15 @@ A laptop-specific test has not been performed. The Python image supports the liv
 
 ## Local image build and diagnostics
 
-Build the application candidate from this folder and tag the three locally available images under the selected namespace:
+To rebuild and publish an application-image update from this folder:
 
 ```powershell
 docker build -t eswarsamanthula/traffic-controller-app:1.1.0 .
-docker tag eswar1231/traffic-controller-nodered:1.0.0 eswarsamanthula/traffic-controller-nodered:1.0.0
-docker tag eswar1231/traffic-controller-mqtt:1.0.0 eswarsamanthula/traffic-controller-mqtt:1.0.0
-
-# Only after repository/image approval and repository creation in Docker Hub:
 docker login --username eswarsamanthula
 docker push eswarsamanthula/traffic-controller-app:1.1.0
-docker push eswarsamanthula/traffic-controller-nodered:1.0.0
-docker push eswarsamanthula/traffic-controller-mqtt:1.0.0
 ```
+
+Use new version tags when publishing changed Node-RED or Mosquitto images; rebuild them with `node_red/Dockerfile` or `mqtt/Dockerfile` and update their Compose tags to match.
 
 Compose diagnostics:
 

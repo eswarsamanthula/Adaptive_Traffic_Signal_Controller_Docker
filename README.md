@@ -99,9 +99,21 @@ intersection.
 
 ## Docker experiment
 
-For the isolated Compose setup, service map, persistence details, and second-laptop
-instructions, see **[README-Docker.md](README-Docker.md)**. Start the complete
-stack from this folder with `docker compose up -d`.
+The portable images are published under Docker Hub namespace `eswarsamanthula`:
+`traffic-controller-app:1.1.0`, `traffic-controller-nodered:1.0.0`, and
+`traffic-controller-mqtt:1.0.0`. Docker Desktop and internet access are enough
+to run the stack; the Python/Node.js development environments are not required.
+From a folder containing `docker-compose.yml`, run:
+
+```powershell
+docker compose pull
+docker compose up -d
+```
+
+For the service map, persistent-volume details, Cloudflare Quick Tunnel steps,
+stop commands, and second-laptop instructions, see
+**[README-Docker.md](README-Docker.md)**. Quick Tunnel URLs are temporary and
+change when `cloudflared` is stopped and started.
 
 ## Prerequisites (tested versions)
 
